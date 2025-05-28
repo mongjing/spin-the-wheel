@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="shortcut icon" href="cow.png"> 
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="輪盤網站">
+	<meta name="keyword" content="輪盤,孟瑾,網站">
+	<meta name="author" content="呂孟瑾">
+	<meta name="murmur" content="。。。">
+	<meta name="robots" content="index,follow">
+	<meta property="og:title" content="輪盤網站">
+	 <title>決定命運</title>
+    <style>
+        body {
+            background-color: #000000;
+        }
+
+        .header {
+            padding: 40px;
+            color: #fff;
+            margin: 0 auto;
+            margin-bottom: 40px;
+        }
+
+        .header h1, p {
+            text-align: center;
+        }
+
+        .wheel {
+            display: flex;
+            justify-content: center;
+            position: relative;
+        }
+
+        .center-circle {
+            width: 100px;
+            height: 100px;
+            border-radius: 60px;
+            background-color: #fff;
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+        }
+
+        .triangle {
+            width: 0;
+            height: 0;
+            border-top: 10px solid transparent;
+            border-bottom: 10px solid transparent;
+            border-right: 30px solid white;
+            position: absolute;
+            top: 50%;
+            right: -220%;
+            transform: translateY(-50%);
+        }
+
+        textarea {
+            background-color: rgba(20, 20, 20, 0.2);
+            caret-color: #fff;
+            resize: none;
+            color: #fff;
+        }
+
+        .inputArea {
+            display: flex;
+            justify-content: center;
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>MongJing</h1>
+        <p id="winner">如果你跟我一樣有選擇困難症，我們用輪盤決定</p>
+    </div>
+    <div class="wheel">
+        <canvas id="canvas" width="500" height="500"></canvas>
+        <div class="center-circle" onclick="spin()">
+            <div class="triangle"></div>
+        </div>
+    </div>
+    <div class="inputArea" onchange="createWheel()">
+        <textarea rows="20" cols="30">
+法拉利
+我要休學
+好餓
+歐趴
+豬肉滿福堡加蛋
+噢買尬
+你的選擇
+命運
+我是一隻雞</textarea>
+    </div>
+
+    <script>
+        // ✅ 你自訂的十種顏色（可以替換成你喜歡的）
+        const userColorPalette = [
+            "#213448", "#547792", "#94B4C1", "#ECEFCA", "#9EC6F3",
+            "#9B7EBD", "#FFE1E0", "#F49BAB", "#9FB3DF", "#FFF1D5"
+        ];
+
+        function getRandomColorFromPalette() {
+            return userColorPalette[Math.floor(Math.random() * userColorPalette.length)];
+        }
+
+        function toRad(deg) {
+            return deg * (Math.PI / 180.0);
+        }
+
+        function getPercent(input, min, max) {
+            return (((input - min) * 100) / (max - min)) / 100;
+        }
+
+        function easeOutSine(x) {
+            return Math.sin((x * Math.PI) / 2);
+        }
+
+        const canvas = document.getElementById("canvas")
+        const ctx = canvas.getContext("2d")
+        const width = canvas.width
+        const height = canvas.height
+
+        const centerX = width / 2
+        const centerY = height / 2
+        const radius = width / 2
+
+        let items = document.getElementsByTagName("textarea")[0].value.split("\n").filter(i => i.trim() !== "");
+        let currentDeg = 0
+        let step = 360 / items.length
+        let colors = []
+        let itemDegs = {}
+
+        function createWheel() {
+            items = document.getElementsByTagName("textarea")[0].value.split("\n").filter(i => i.trim() !== "");
+            step = 360 / items.length
+            colors = []
+            for (let i = 0; i < items.length; i++) {
+                colors.push(getRandomColorFromPalette());
+            }
+            draw()
+        }
+
+        createWheel()
+
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, toRad(0), toRad(360));
+            ctx.fillStyle = `rgb(33,33,33)`
+            ctx.lineTo(centerX, centerY);
+            ctx.fill()
+
+            let startDeg = currentDeg;
+            for (let i = 0; i < items.length; i++, startDeg += step) {
+                let endDeg = startDeg + step
+
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius - 2, toRad(startDeg), toRad(endDeg))
+                ctx.fillStyle = colors[i]
+                ctx.lineTo(centerX, centerY);
+                ctx.fill()
+
+                // draw text
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(toRad((startDeg + endDeg) / 2));
+                ctx.textAlign = "center";
+                ctx.fillStyle = "#fff";
+                ctx.font = 'bold 16px serif';
+                ctx.fillText(items[i], 130, 10);
+                ctx.restore();
+
+                itemDegs[items[i]] = {
+                    "startDeg": startDeg,
+                    "endDeg": endDeg
+                }
+
+                // 判斷最上面區塊的文字（中選者）
+                if (startDeg % 360 < 360 && startDeg % 360 > 270 && endDeg % 360 > 0 && endDeg % 360 < 90) {
+                    document.getElementById("winner").innerHTML = items[i]
+                }
+            }
+        }
+
+        let speed = 0
+        let maxRotation = 0
+        let pause = false
+
+        function animate() {
+            if (pause) return;
+            speed = easeOutSine(getPercent(currentDeg, maxRotation, 0)) * 20
+            if (speed < 0.01) {
+                speed = 0
+                pause = true
+            }
+            currentDeg += speed
+            draw()
+            window.requestAnimationFrame(animate);
+        }
+
+        function spin() {
+            if (speed != 0) return;
+
+            maxRotation = 0;
+            currentDeg = 0
+            createWheel()
+            draw();
+
+            const firstItem = items[0] || "cat"; // fallback
+            maxRotation = (360 * 6) - itemDegs[firstItem].endDeg + 10
+            itemDegs = {}
+            pause = false
+            window.requestAnimationFrame(animate);
+        }
+    </script>
+</body>
+</html>
